@@ -1,32 +1,80 @@
 ﻿using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace EntityFrameworkExercise.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class CustomersController(StoreContext context) : ControllerBase
+public class CustomersController(StoreContext context, ILogger<Customer> logger) : ControllerBase
 {
     // GET: api/Customers
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
+    public async Task<IActionResult> GetCustomers()
     {
-        return default;
+        logger.LogInformation("I am an Information");
+        logger.LogWarning("I am a Warning");
+        logger.LogInformation("I am an Error");
+
+        var listResult = await context.Customers
+            .Include(x => x.Sales)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                Sales = c.Sales.Select(s => new {s.Id})
+            })
+            .ToListAsync();
+        return Ok(listResult);
     }
+
+
+
 
     // GET: api/Customers/5
     [HttpGet("{id}")]
-    public async Task<ActionResult<Customer>> GetCustomer(int id)
+    public async Task<IActionResult> GetCustomer(int id)
     {
-        return default;
+     
+        var listResult = await context.Customers
+            .Where(c => c.Id == id) //search the customer for Id
+            .Include(c => c.Sales) //include Sales in the search
+            .Select(c => new //for each 'c' create a new object
+            {
+                c.Id,
+                c.Name,
+                Sales = c.Sales
+                .Select(s => new { s.Id }) //include de Id of Sales
+            })
+            .FirstOrDefaultAsync();
+
+        if(listResult == null)
+        {
+            return NotFound("Id Invalid, try again!");
+        }
+        return Ok(listResult);
     }
+
+
 
     // PUT: api/Customers/5
     [HttpPut("{id}")]
     public async Task<IActionResult> PutCustomer(int id, Customer customer)
     {
-        return default;
+        var custumerResult = await context.Customers
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (custumerResult == null)
+        {
+            return NotFound("Customer not found!");
+        }
+
+        custumerResult.Name = customer.Name;
+
+        await context.SaveChangesAsync();
+
+        return Ok(custumerResult);
     }
 
     // POST: api/Customers
