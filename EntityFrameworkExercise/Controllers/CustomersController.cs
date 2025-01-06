@@ -1,7 +1,9 @@
 ﻿using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 
 namespace EntityFrameworkExercise.Controllers;
 
@@ -29,9 +31,6 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
         return Ok(listResult);
     }
 
-
-
-
     // GET: api/Customers/5
     [HttpGet("{id}")]
     public async Task<IActionResult> GetCustomer(int id)
@@ -57,7 +56,6 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     }
 
 
-
     // PUT: api/Customers/5
     [HttpPut("{id}")]
     public async Task<IActionResult> PutCustomer(int id, Customer customer)
@@ -67,7 +65,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 
         if (custumerResult == null)
         {
-            return NotFound("Customer not found!");
+            return NotFound(new { Message = "Custumer not found!" });
         }
 
         custumerResult.Name = customer.Name;
@@ -79,15 +77,33 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 
     // POST: api/Customers
     [HttpPost]
-    public async Task<ActionResult<Customer>> PostCustomer(Customer customer)
+    public async Task<IActionResult> PostCustomer(Customer customer)
     {
-        return default;
+        var newCustomer = new Customer
+        {
+            Id = customer.Id,
+            Name = customer.Name,
+            Sales = customer.Sales
+        };
+
+        context.Customers.Add(newCustomer);
+        await context.SaveChangesAsync();
+        return CreatedAtAction(nameof(PostCustomer), new { id = newCustomer.Id }, newCustomer);
     }
 
     // DELETE: api/Customers/5
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
-        return default;
+        var custumerResult = await context.Customers.FirstOrDefaultAsync(c => c.Id == id);
+
+        if(custumerResult == null)
+        {
+            return NotFound("Custumer not found!");
+        }
+
+        context.Customers.Remove(custumerResult);
+        await context.SaveChangesAsync();
+        return NoContent();
     }
 }
