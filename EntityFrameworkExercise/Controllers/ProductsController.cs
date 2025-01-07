@@ -7,7 +7,7 @@ namespace EntityFrameworkExercise.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ProductsController(StoreContext context) : ControllerBase
+public class ProductsController(StoreContext context, ILogger<Customer> logger) : ControllerBase
 {
     // GET: api/Products
     [HttpGet]
@@ -45,10 +45,11 @@ public class ProductsController(StoreContext context) : ControllerBase
                 .OrderBy(s => s.Id)
                 .Select(s => new { s.Id })
             })
-            .FirstOrDefaultAsync();
+            .SingleOrDefaultAsync();
 
         if (productResult == null)
         {
+            logger.LogWarning("The product is null");
             return NotFound();
         }
 
@@ -59,38 +60,55 @@ public class ProductsController(StoreContext context) : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> PutProduct(int id, Product product)
     {
-        var productResult = await context.Products
-            .FirstOrDefaultAsync(p => p.Id == id);
-
-        if (productResult == null)
+        try
         {
-            return NotFound();
+            var productResult = await context.Products
+                .SingleOrDefaultAsync(p => p.Id == id);
+
+            if (productResult == null)
+            {
+                logger.LogWarning("The product is null");
+                return NotFound();
+            }
+
+            productResult.Name = product.Name;
+            productResult.Price = product.Price;
+
+            await context.SaveChangesAsync();
+
+            return Ok(productResult);
         }
-
-        productResult.Name = product.Name;
-        productResult.Price = product.Price;
-
-        await context.SaveChangesAsync();
-
-        return Ok(productResult);
+        catch(DbUpdateException dbEx) //database related errors - other option is use 'Exception ex' for anything error in application, but is more generic
+        {
+            logger.LogError(dbEx, "Database update failed for product ID {Id}", id);
+            return BadRequest();
+        }
     }
 
     // POST: api/Products
     [HttpPost]
     public async Task<IActionResult> PostProduct(Product product)
     {
-        var newProduct = new Product
+        
+        try
         {
-            Id = product.Id,
-            Name = product.Name,
-            Price = product.Price,
-            Sales = product.Sales
-        };
+            var newProduct = new Product
+            {
+                Id = product.Id,
+                Name = product.Name,
+                Price = product.Price,
+                Sales = product.Sales
+            };
 
-        context.Products.Add(newProduct);
-        await context.SaveChangesAsync();
-        return CreatedAtAction(nameof(PostProduct), new { id = newProduct.Id }, newProduct);
-
+            context.Products.Add(newProduct);
+            await context.SaveChangesAsync();
+            return CreatedAtAction(nameof(PostProduct), new { id = newProduct.Id }, newProduct);
+        }
+        catch (DbUpdateException dbEx)
+        {
+            logger.LogError(dbEx, "Failed to create product");
+            return BadRequest();
+        }
     }
 
     // DELETE: api/Products/5
@@ -98,10 +116,11 @@ public class ProductsController(StoreContext context) : ControllerBase
     public async Task<IActionResult> DeleteProduct(int id)
     {
         var productResult = await context.Products
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .SingleOrDefaultAsync(p => p.Id == id);
 
-        if(productResult == null)
+        if (productResult == null)
         {
+            logger.LogWarning("The product is null");
             return NotFound();
         }
 

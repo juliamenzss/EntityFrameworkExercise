@@ -46,10 +46,11 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
                 Sales = c.Sales
                 .Select(s => new { s.Id }) //include de Id of Sales
             })
-            .FirstOrDefaultAsync();
+            .SingleOrDefaultAsync();
 
         if(listResult == null)
         {
+            logger.LogWarning("The customer is null");
             return NotFound();
         }
         return Ok(listResult);
@@ -60,35 +61,52 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     [HttpPut("{id}")]
     public async Task<IActionResult> PutCustomer(int id, Customer customer)
     {
-        var customerResult = await context.Customers
-            .FirstOrDefaultAsync(c => c.Id == id);
-
-        if (customerResult == null)
+        try
         {
-            return NotFound();
+            var customerResult = await context.Customers
+                       .SingleOrDefaultAsync(c => c.Id == id);
+
+            if (customerResult == null)
+            {
+                logger.LogWarning("The customer is null");
+                return NotFound();
+            }
+
+            customerResult.Name = customer.Name;
+
+            await context.SaveChangesAsync();
+
+            return Ok(customerResult);
         }
-
-        customerResult.Name = customer.Name;
-
-        await context.SaveChangesAsync();
-
-        return Ok(customerResult);
+         catch(DbUpdateException dbEx)
+        {
+            logger.LogError(dbEx, "Database update failed for customer ID {Id}", id);
+            return BadRequest();
+        }
     }
 
     // POST: api/Customers
     [HttpPost]
     public async Task<IActionResult> PostCustomer(Customer customer)
     {
-        var newCustomer = new Customer
+        try
         {
-            Id = customer.Id,
-            Name = customer.Name,
-            Sales = customer.Sales
-        };
+            var newCustomer = new Customer
+            {
+                Id = customer.Id,
+                Name = customer.Name,
+                Sales = customer.Sales
+            };
 
-        context.Customers.Add(newCustomer);
-        await context.SaveChangesAsync();
-        return CreatedAtAction(nameof(PostCustomer), new { id = newCustomer.Id }, newCustomer);
+            context.Customers.Add(newCustomer);
+            await context.SaveChangesAsync();
+            return CreatedAtAction(nameof(PostCustomer), new { id = newCustomer.Id }, newCustomer);
+        }
+        catch (DbUpdateException dbEx)
+        {
+            logger.LogError(dbEx, "Failed to create customer");
+            return BadRequest();
+        }
     }
 
     // DELETE: api/Customers/5
@@ -96,10 +114,11 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     public async Task<IActionResult> DeleteCustomer(int id)
     {
         var customerResult = await context.Customers
-            .FirstOrDefaultAsync(c => c.Id == id);
+            .SingleOrDefaultAsync(c => c.Id == id);
 
         if(customerResult == null)
         {
+            logger.LogWarning("The customer is null");
             return NotFound();
         }
 
