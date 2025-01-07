@@ -50,7 +50,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 
         if(listResult == null)
         {
-            return NotFound("Id Invalid, try again!");
+            return NotFound();
         }
         return Ok(listResult);
     }
@@ -60,19 +60,19 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     [HttpPut("{id}")]
     public async Task<IActionResult> PutCustomer(int id, Customer customer)
     {
-        var custumerResult = await context.Customers
+        var customerResult = await context.Customers
             .FirstOrDefaultAsync(c => c.Id == id);
 
-        if (custumerResult == null)
+        if (customerResult == null)
         {
-            return NotFound(new { Message = "Custumer not found!" });
+            return NotFound();
         }
 
-        custumerResult.Name = customer.Name;
+        customerResult.Name = customer.Name;
 
         await context.SaveChangesAsync();
 
-        return Ok(custumerResult);
+        return Ok(customerResult);
     }
 
     // POST: api/Customers
@@ -95,14 +95,15 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
-        var custumerResult = await context.Customers.FirstOrDefaultAsync(c => c.Id == id);
+        var customerResult = await context.Customers
+            .FirstOrDefaultAsync(c => c.Id == id);
 
-        if(custumerResult == null)
+        if(customerResult == null)
         {
-            return NotFound("Custumer not found!");
+            return NotFound();
         }
 
-        context.Customers.Remove(custumerResult);
+        context.Customers.Remove(customerResult);
         await context.SaveChangesAsync();
         return NoContent();
     }
