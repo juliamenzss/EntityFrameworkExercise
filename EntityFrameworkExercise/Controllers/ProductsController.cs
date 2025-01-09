@@ -1,6 +1,8 @@
-﻿using EntityFrameworkExercise.Data;
+﻿using System.Drawing.Printing;
+using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
 namespace EntityFrameworkExercise.Controllers;
@@ -11,7 +13,7 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
 {
     // GET: api/Products
     [HttpGet]
-    public async Task<IActionResult> GetProducts()
+    public async Task<IActionResult> GetProducts(int page = 1, int pageSize = 10)
     {
         var productList = await context.Products
             .Include(s => s.Sales)
@@ -23,8 +25,12 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
                 Sales = p.Sales
                 .OrderBy(s => s.Id)
                 .Select(s => new { s.Id })
+                .ToList()
             })
-            .ToListAsync();
+        .OrderBy(p => p.Id)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
 
         return Ok(productList);
     }
@@ -60,25 +66,23 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
     [HttpPut("{id}")]
     public async Task<IActionResult> PutProduct(int id, Product product)
     {
+        var productResult = await context.Products
+         .SingleOrDefaultAsync(p => p.Id == id);
+
+        if (productResult == null)
+        {
+            logger.LogWarning("The product is null");
+            return NotFound();
+        }
+
+        productResult.Name = product.Name;
+        productResult.Price = product.Price;
         try
         {
-            var productResult = await context.Products
-                .SingleOrDefaultAsync(p => p.Id == id);
-
-            if (productResult == null)
-            {
-                logger.LogWarning("The product is null");
-                return NotFound();
-            }
-
-            productResult.Name = product.Name;
-            productResult.Price = product.Price;
-
             await context.SaveChangesAsync();
-
             return Ok(productResult);
         }
-        catch(DbUpdateException dbEx) //database related errors - other option is use 'Exception ex' for anything error in application, but is more generic
+        catch (DbUpdateException dbEx) //database related errors - other option is use 'Exception ex' for anything error in application, but is more generic
         {
             logger.LogError(dbEx, "Database update failed for product ID {Id}", id);
             return BadRequest();
@@ -89,18 +93,16 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
     [HttpPost]
     public async Task<IActionResult> PostProduct(Product product)
     {
-        
+        var newProduct = new Product
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Price = product.Price,
+            Sales = product.Sales
+        };
+        context.Products.Add(newProduct);
         try
         {
-            var newProduct = new Product
-            {
-                Id = product.Id,
-                Name = product.Name,
-                Price = product.Price,
-                Sales = product.Sales
-            };
-
-            context.Products.Add(newProduct);
             await context.SaveChangesAsync();
             return CreatedAtAction(nameof(PostProduct), new { id = newProduct.Id }, newProduct);
         }

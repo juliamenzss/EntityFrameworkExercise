@@ -13,7 +13,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 {
     // GET: api/Customers
     [HttpGet]
-    public async Task<IActionResult> GetCustomers()
+    public async Task<IActionResult> GetCustomers(int page = 1, int pageSize = 10)
     {
         logger.LogInformation("I am an Information");
         logger.LogWarning("I am a Warning");
@@ -25,9 +25,12 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
             {
                 c.Id,
                 c.Name,
-                Sales = c.Sales.Select(s => new 
-                {s.Id})
+                Sales = c.Sales.Select(s => new
+                { s.Id })
             })
+            .OrderBy(c => c.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
         return Ok(listResult);
     }
@@ -36,7 +39,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     [HttpGet("{id}")]
     public async Task<IActionResult> GetCustomer(int id)
     {
-     
+
         var customerResult = await context.Customers
             .Where(c => c.Id == id) //search the customer for Id
             .Include(c => c.Sales) //include Sales in the search
@@ -49,7 +52,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
             })
             .SingleOrDefaultAsync();
 
-        if(customerResult == null)
+        if (customerResult == null)
         {
             logger.LogWarning("The customer is null");
             return NotFound();
@@ -79,7 +82,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 
             return Ok(customerResult);
         }
-         catch(DbUpdateException dbEx)
+        catch (DbUpdateException dbEx)
         {
             logger.LogError(dbEx, "Database update failed for customer ID {Id}", id);
             return BadRequest();
@@ -117,7 +120,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
         var customerResult = await context.Customers
             .SingleOrDefaultAsync(c => c.Id == id);
 
-        if(customerResult == null)
+        if (customerResult == null)
         {
             logger.LogWarning("The customer is null");
             return NotFound();
