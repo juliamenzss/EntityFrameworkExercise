@@ -7,7 +7,7 @@ namespace EntityFrameworkExercise.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ProductsController(StoreContext context, ILogger<Customer> logger) : ControllerBase
+public class ProductsController(StoreContext context, ILogger<Product> logger) : ControllerBase
 {
     // GET: api/Products
     [HttpGet]

@@ -25,7 +25,8 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
             {
                 c.Id,
                 c.Name,
-                Sales = c.Sales.Select(s => new {s.Id})
+                Sales = c.Sales.Select(s => new 
+                {s.Id})
             })
             .ToListAsync();
         return Ok(listResult);
@@ -36,7 +37,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     public async Task<IActionResult> GetCustomer(int id)
     {
      
-        var listResult = await context.Customers
+        var customerResult = await context.Customers
             .Where(c => c.Id == id) //search the customer for Id
             .Include(c => c.Sales) //include Sales in the search
             .Select(c => new //for each 'c' create a new object
@@ -48,12 +49,12 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
             })
             .SingleOrDefaultAsync();
 
-        if(listResult == null)
+        if(customerResult == null)
         {
             logger.LogWarning("The customer is null");
             return NotFound();
         }
-        return Ok(listResult);
+        return Ok(customerResult);
     }
 
 

@@ -12,20 +12,90 @@ namespace EntityFrameworkExercise.Controllers;
 
     [Route("api/[controller]")]
     [ApiController]
-    public class SalesController(StoreContext context) : ControllerBase
+    public class SalesController(StoreContext context , ILogger<Sale> logger) : ControllerBase
     {
         // GET: api/Sales
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Sale>>> GetSales()
+        public async Task<IActionResult> GetSales(int page = 1, int pageSize = 10)
         {
-            return default;
+
+            var totalCount = await context.Sales.CountAsync();
+            var totalPages = (int)Math.Ceiling((decimal)totalCount / pageSize);
+
+            var listResult = await context.Sales
+                .Include(s => s.Seller)
+                .Include(s => s.Customer)
+                .Include(s => s.Products)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.Date,
+                    Seller = new
+                    {
+                        s.Seller.Id,
+                        s.Seller.Name
+                    },
+                    Customer = new
+                    {
+                        s.Customer.Id,
+                        s.Customer.Name
+                    },
+                    Products = s.Products.Select(p => new
+                    {
+                        p.Id,
+                        p.Name,
+                        Price = Math.Round(p.Price, 2)
+                    })
+                    .OrderBy(p => p.Id)
+                    .ToList()
+                })  
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            return Ok(listResult);
         }
 
         // GET: api/Sales/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Sale>> GetSale(int id)
+        public async Task<IActionResult> GetSale(int id)
         {
-            return default;
+            var saleResult = await context.Sales
+            .Where(s => s.Id == id)
+            .Include(s => s.Seller)
+            .Include(s => s.Customer)
+            .Include(s => s.Products)
+            .Select(s => new
+            {
+                s.Id,
+                s.Date,
+                Seller = new
+                {
+                    s.Seller.Id,
+                    s.Seller.Name
+                },
+                Customer = new
+                {
+                    s.Customer.Id,
+                    s.Customer.Name
+                },
+                Products = s.Products.Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    Price = Math.Round(p.Price, 2)
+                })
+                    .OrderBy(p => p.Id)
+                    .ToList()
+            })
+            .SingleOrDefaultAsync();
+
+        if (saleResult == null)
+        {
+            logger.LogWarning("The sale is null");
+            return NotFound();
+        }
+
+        return Ok(saleResult);
         }
 
         // PUT: api/Sales/5
@@ -46,6 +116,17 @@ namespace EntityFrameworkExercise.Controllers;
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteSale(int id)
         {
-            return default;
+            var sale = await context.Sales
+                    .SingleOrDefaultAsync(s => s.Id == id);
+
+            if (sale == null)
+            {
+                logger.LogWarning("The sale is null");
+                return NotFound();
+            }
+
+            context.Sales.Remove(sale);
+            await context.SaveChangesAsync();
+            return NoContent();
         }
     }
