@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
+using EntityFrameworkExercise.Requests;
 
 namespace EntityFrameworkExercise.Controllers;
 
@@ -95,67 +96,89 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
 
     // PUT: api/Sales/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutSale(int id, Sale sale)
+    public async Task<IActionResult> PutSale(int id, SaleUpdateRequest request)
     {
 
-        if (id != sale.Id)
+        var sale = await context.Sales.SingleOrDefaultAsync(sale => sale.Id == id);
+        if (sale == null)
         {
-            logger.LogWarning("Sale not found");
+            logger.LogWarning("The sale is null");
             return NotFound();
         }
 
-        var saleResult = await context.Sales
-        .Include(s => s.Products)
-        .SingleOrDefaultAsync(s => s.Id == id);
-
-        if (saleResult == null)
-        {
-            logger.LogWarning("Sale not found: {Id}", id);
-            return NotFound();
-        }
-
-        saleResult.Date = sale.Date;
-        saleResult.SellerId = sale.SellerId;
-        saleResult.CustomerId = sale.CustomerId;
-
-        saleResult.Products.Clear();
-        foreach (var product in sale.Products)
-        {
-            saleResult.Products.Add(product);
-        }
+        sale.Date = request.Date;
+        sale.SellerId = request.SellerId;
+        sale.CustomerId = request.CustomerId;
 
         try
         {
             await context.SaveChangesAsync();
-            return Ok(saleResult);
+            return NoContent();
         }
-        catch (DbUpdateException dbEx)
+        catch (Exception ex)
         {
-            logger.LogError(dbEx, "Database update failed for sale {Id}", id);
-            return BadRequest();
+            logger.LogError(ex, "Error to update sale");
+            return BadRequest("Error to uptade sale");
         }
-    }
 
+
+    }
     // POST: api/Sales
     [HttpPost]
-    public async Task<IActionResult> PostSale(Sale sale)
+    public async Task<IActionResult> PostSale(SaleCreateRequest request)
     {
-        var newSale = new Sale
+        if (request == null)
         {
-            SellerId = sale.SellerId,
-            CustomerId = sale.CustomerId,
-            Products = sale.Products
-        };
-        context.Sales.Add(newSale);
+            return BadRequest("Request is null");
+        }
         try
         {
+            var seller = await context.Sellers.FirstOrDefaultAsync(s => s.Id == request.SellerId);
+            if (seller == null)
+            {
+                logger.LogWarning("Seller is null");
+                return NotFound();
+            }
+
+            var customer = await context.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId);
+            if (customer == null)
+            {
+                logger.LogWarning("Customer is null");
+                return NotFound();
+            }
+
+            if (request.Products == null || request.Products.Count == 0)
+            {
+                logger.LogWarning("Product List is null or empty");
+                return NotFound();
+            }
+
+            var newSale = new Sale
+            {
+                Date = request.Date,
+                SellerId = request.SellerId,
+                CustomerId = request.CustomerId,
+            };
+
+            context.Sales.Add(newSale);
             await context.SaveChangesAsync();
-            return CreatedAtAction(nameof(PostSale), new { id = newSale.Id }, newSale);
+
+            foreach (var product in request.Products)
+            {
+                var productSale = new ProductSale
+                {
+                    ProductId = product.Id,
+                    SaleId = newSale.Id
+                };
+            }
+
+
+            return NoContent();
         }
-        catch (DbUpdateException dbEx)
+        catch (Exception ex)
         {
-            logger.LogError(dbEx, "Error creating sale");
-            return BadRequest();
+            logger.LogError(ex, "Error to create sale");
+            return BadRequest("Error to create sale");
         }
     }
 

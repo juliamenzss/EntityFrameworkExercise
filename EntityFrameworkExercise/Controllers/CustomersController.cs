@@ -1,5 +1,6 @@
 ﻿using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
+using EntityFrameworkExercise.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -63,24 +64,24 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 
     // PUT: api/Customers/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutCustomer(int id, Customer customer)
+    public async Task<IActionResult> PutCustomer(int id, CustomerCreateRequest request)
     {
         try
         {
-            var customerResult = await context.Customers
+            var customer = await context.Customers
                        .SingleOrDefaultAsync(c => c.Id == id);
 
-            if (customerResult == null)
+            if (customer == null)
             {
                 logger.LogWarning("The customer is null");
                 return NotFound();
             }
 
-            customerResult.Name = customer.Name;
+            customer.Name = request.Name;
 
             await context.SaveChangesAsync();
 
-            return Ok(customerResult);
+            return Ok(customer);
         }
         catch (DbUpdateException dbEx)
         {
@@ -91,18 +92,18 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
 
     // POST: api/Customers
     [HttpPost]
-    public async Task<IActionResult> PostCustomer(Customer customer)
+    public async Task<IActionResult> PostCustomer(CustomerCreateRequest request)
     {
+        var newCustomer = new Customer
+        {
+            Name = request.Name,
+            //Sales = request.Sales
+        };
+
+        context.Customers.Add(newCustomer);
+
         try
         {
-            var newCustomer = new Customer
-            {
-                Id = customer.Id,
-                Name = customer.Name,
-                Sales = customer.Sales
-            };
-
-            context.Customers.Add(newCustomer);
             await context.SaveChangesAsync();
             return CreatedAtAction(nameof(PostCustomer), new { id = newCustomer.Id }, newCustomer);
         }
