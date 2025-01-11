@@ -97,7 +97,6 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
         var newCustomer = new Customer
         {
             Name = request.Name,
-            //Sales = request.Sales
         };
 
         context.Customers.Add(newCustomer);
@@ -105,7 +104,7 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
         try
         {
             await context.SaveChangesAsync();
-            return CreatedAtAction(nameof(PostCustomer), new { id = newCustomer.Id }, newCustomer);
+            return CreatedAtAction(nameof(GetCustomer), new { id = newCustomer.Id }, newCustomer);
         }
         catch (DbUpdateException dbEx)
         {

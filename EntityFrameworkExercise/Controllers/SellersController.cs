@@ -1,5 +1,6 @@
 ﻿using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
+using EntityFrameworkExercise.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -60,7 +61,7 @@ public class SellersController(StoreContext context, ILogger<Seller> logger) : C
 
     // PUT: api/Sellers/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutSeller(int id, Seller seller)
+    public async Task<IActionResult> PutSeller(int id, SellerUpdateRequest request)
     {
         var sellerResult = await context.Sellers
             .SingleOrDefaultAsync(s => s.Id == id);
@@ -71,8 +72,7 @@ public class SellersController(StoreContext context, ILogger<Seller> logger) : C
             return BadRequest();
         }
 
-        sellerResult.Name = seller.Name;
-        sellerResult.Sales = seller.Sales;
+        sellerResult.Name = request.Name;
 
         try
         {
@@ -88,20 +88,18 @@ public class SellersController(StoreContext context, ILogger<Seller> logger) : C
     }
     // POST: api/Sellers
     [HttpPost]
-    public async Task<IActionResult> PostSeller(Seller seller)
+    public async Task<IActionResult> PostSeller(SellerCreateRequest request)
 
     {
         var newSeller = new Seller
         {
-            Id = seller.Id,
-            Name = seller.Name,
-            Sales = seller.Sales
+            Name = request.Name,
         };
         context.Sellers.Add(newSeller);
         try
         {
             await context.SaveChangesAsync();
-            return Ok(newSeller);
+            return CreatedAtAction(nameof(GetSeller), new { id = newSeller.Id }, newSeller);
         }
         catch (DbUpdateException dbEx)
         {

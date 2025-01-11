@@ -1,6 +1,7 @@
 ﻿using System.Drawing.Printing;
 using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
+using EntityFrameworkExercise.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -64,7 +65,7 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
 
     // PUT: api/Products/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutProduct(int id, Product product)
+    public async Task<IActionResult> PutProduct(int id, ProductUpdateRequest request)
     {
         var productResult = await context.Products
          .SingleOrDefaultAsync(p => p.Id == id);
@@ -75,8 +76,8 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
             return NotFound();
         }
 
-        productResult.Name = product.Name;
-        productResult.Price = product.Price;
+        productResult.Name = request.Name;
+        productResult.Price = Math.Round(request.Price, 2);
         try
         {
             await context.SaveChangesAsync();
@@ -91,20 +92,18 @@ public class ProductsController(StoreContext context, ILogger<Product> logger) :
 
     // POST: api/Products
     [HttpPost]
-    public async Task<IActionResult> PostProduct(Product product)
+    public async Task<IActionResult> PostProduct(ProductCreateRequest request)
     {
         var newProduct = new Product
         {
-            Id = product.Id,
-            Name = product.Name,
-            Price = product.Price,
-            Sales = product.Sales
+            Name = request.Name,
+            Price = Math.Round(request.Price, 2),
         };
         context.Products.Add(newProduct);
         try
         {
             await context.SaveChangesAsync();
-            return CreatedAtAction(nameof(PostProduct), new { id = newProduct.Id }, newProduct);
+            return CreatedAtAction(nameof(GetProduct), new { id = newProduct.Id }, newProduct);
         }
         catch (DbUpdateException dbEx)
         {

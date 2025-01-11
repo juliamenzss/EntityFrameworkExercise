@@ -106,7 +106,6 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
             return NotFound();
         }
 
-        sale.Date = request.Date;
         sale.SellerId = request.SellerId;
         sale.CustomerId = request.CustomerId;
 
@@ -120,8 +119,6 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
             logger.LogError(ex, "Error to update sale");
             return BadRequest("Error to uptade sale");
         }
-
-
     }
     // POST: api/Sales
     [HttpPost]
@@ -133,29 +130,22 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
         }
         try
         {
+            var products = await context.Products
+                .Where(p => request.Products
+                .Contains(p.Id))
+                .ToListAsync();
+
             var seller = await context.Sellers.FirstOrDefaultAsync(s => s.Id == request.SellerId);
-            if (seller == null)
-            {
-                logger.LogWarning("Seller is null");
-                return NotFound();
-            }
-
             var customer = await context.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId);
-            if (customer == null)
-            {
-                logger.LogWarning("Customer is null");
-                return NotFound();
-            }
 
-            if (request.Products == null || request.Products.Count == 0)
+            if (seller == null || customer == null || products == null)
             {
-                logger.LogWarning("Product List is null or empty");
+                logger.LogWarning("Seller, product or customer is null or empty");
                 return NotFound();
             }
 
             var newSale = new Sale
             {
-                Date = request.Date,
                 SellerId = request.SellerId,
                 CustomerId = request.CustomerId,
             };
@@ -167,13 +157,14 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
             {
                 var productSale = new ProductSale
                 {
-                    ProductId = product.Id,
+                    ProductId = product,
                     SaleId = newSale.Id
                 };
+                context.ProductsSales.Add(productSale);
             }
+            await context.SaveChangesAsync();
 
-
-            return NoContent();
+            return CreatedAtAction(nameof(GetSale),new { id = newSale.Id }, null);
         }
         catch (Exception ex)
         {
