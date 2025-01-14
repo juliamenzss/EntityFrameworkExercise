@@ -1,8 +1,10 @@
 ﻿using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
 using EntityFrameworkExercise.Requests;
+using EntityFrameworkExercise.Response;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Swashbuckle.Swagger.Annotations;
 
 namespace EntityFrameworkExercise.Controllers;
 
@@ -10,19 +12,18 @@ namespace EntityFrameworkExercise.Controllers;
 [ApiController]
 public class SellersController(StoreContext context, ILogger<Seller> logger) : ControllerBase
 {
-    // GET: api/Sellers
     [HttpGet]
+    [SwaggerOperation("Return a list of Seller")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<SellerResponse>))]
     public async Task<IActionResult> GetSellers(int page = 1, int pageSize = 10)
     {
         var sellerList = await context.Sellers
             .Include(s => s.Sales)
-            .Select(s => new
+            .Select(s => new SellerResponse
             {
-                s.Id,
-                s.Name,
-                Sales = s.Sales
-                .OrderBy(s => s.Id)
-                .Select(x => new { x.Id })
+                Id = s.Id,
+                Name = s.Name,
+                Sales = s.Sales.Count
             })
             .OrderBy(s => s.Id)
             .Skip((page - 1) * pageSize)
@@ -33,21 +34,19 @@ public class SellersController(StoreContext context, ILogger<Seller> logger) : C
     }
 
 
-    // GET: api/Sellers/5
     [HttpGet("{id}")]
+    [SwaggerOperation("Get seller by id")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSeller(int id)
     {
         var sellerResult = await context.Sellers
             .Where(s => s.Id == id)
-            .Include(s => s.Sales)
-            .Select(s => new
+            .Select(s => new SellerResponse
             {
-                s.Id,
-                s.Name,
-                Sales = s.Sales
-                .Select(s => new { s.Id })
-                .OrderBy(s => s.Id)
-                .ToList()
+                Id = s.Id,
+                Name = s.Name,
+                Sales = s.Sales.Count
             })
             .SingleOrDefaultAsync();
 
@@ -59,68 +58,74 @@ public class SellersController(StoreContext context, ILogger<Seller> logger) : C
         return Ok(sellerResult);
     }
 
-    // PUT: api/Sellers/5
     [HttpPut("{id}")]
+    [SwaggerOperation("Update seller by id")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutSeller(int id, SellerUpdateRequest request)
     {
-        var sellerResult = await context.Sellers
-            .SingleOrDefaultAsync(s => s.Id == id);
-
-        if (sellerResult == null)
-        {
-            logger.LogError("The seller is null");
-            return BadRequest();
-        }
-
-        sellerResult.Name = request.Name;
-
         try
         {
+            var sellerResult = await context.Sellers
+            .SingleOrDefaultAsync(s => s.Id == id);
+
+            if (sellerResult == null)
+            {
+                logger.LogError("The seller is null");
+                return NotFound();
+            }
+
+            sellerResult.Name = request.Name;
             await context.SaveChangesAsync();
             return Ok(sellerResult);
         }
         catch (DbUpdateException dbEx)
         {
-            logger.LogError(dbEx, "Database update failed for seller ID {Id}", id);
+            logger.LogError(dbEx, "Database update failed");
+            return BadRequest();
+        }  
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error to update");
             return BadRequest();
         }
 
     }
-    // POST: api/Sellers
     [HttpPost]
+    [SwaggerOperation("Create a new seller")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> PostSeller(SellerCreateRequest request)
-
     {
-        var newSeller = new Seller
-        {
-            Name = request.Name,
-        };
-        context.Sellers.Add(newSeller);
         try
         {
+            var newSeller = new Seller
+            {
+                Name = request.Name,
+            };
+            context.Sellers.Add(newSeller);
             await context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetSeller), new { id = newSeller.Id }, newSeller);
+            return CreatedAtAction(nameof(GetSeller), "Seller", new { id = newSeller.Id }, newSeller);
         }
         catch (DbUpdateException dbEx)
         {
-            logger.LogError(dbEx, "Failed to create seller");
+            logger.LogError(dbEx, "Failed DB");
+            return BadRequest();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create seller");
             return BadRequest();
         }
     }
 
-    // DELETE: api/Sellers/5
     [HttpDelete("{id}")]
+    [SwaggerOperation("Delete seller by id")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSeller(int id)
     {
-        var sellerResult = await context.Sellers
-            .SingleOrDefaultAsync(s => s.Id == id);
-        if (sellerResult == null)
-        {
-            logger.LogWarning("The seller is null");
-            return NotFound();
-        }
-        context.Sellers.Remove(sellerResult);
-        await context.SaveChangesAsync();
+        await context.Sellers.Where(s => s.Id == id).ExecuteDeleteAsync();
         return NoContent();
     }
 }

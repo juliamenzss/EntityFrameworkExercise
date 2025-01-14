@@ -23,4 +23,5 @@ public class Sale
 
     public Customer Customer { get; set; } = default!;
     public List<Product> Products { get; set; } = default!;
+    public string Name { get; internal set; }
 }

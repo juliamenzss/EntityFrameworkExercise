@@ -1,10 +1,10 @@
 ﻿using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
 using EntityFrameworkExercise.Requests;
+using EntityFrameworkExercise.Response;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using Swashbuckle.Swagger.Annotations;
 
 namespace EntityFrameworkExercise.Controllers;
 
@@ -12,22 +12,17 @@ namespace EntityFrameworkExercise.Controllers;
 [ApiController]
 public class CustomersController(StoreContext context, ILogger<Customer> logger) : ControllerBase
 {
-    // GET: api/Customers
     [HttpGet]
+    [SwaggerOperation("Return a list of Customer")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CustomerResponse>))]
     public async Task<IActionResult> GetCustomers(int page = 1, int pageSize = 10)
     {
-        logger.LogInformation("I am an Information");
-        logger.LogWarning("I am a Warning");
-        logger.LogInformation("I am an Error");
-
         var listResult = await context.Customers
-            .Include(x => x.Sales)
-            .Select(c => new
+            .Select(c => new CustomerResponse
             {
-                c.Id,
-                c.Name,
-                Sales = c.Sales.Select(s => new
-                { s.Id })
+                Id = c.Id,
+                Name = c.Name,
+                Sales = c.Sales.Count
             })
             .OrderBy(c => c.Id)
             .Skip((page - 1) * pageSize)
@@ -36,20 +31,20 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
         return Ok(listResult);
     }
 
-    // GET: api/Customers/5
     [HttpGet("{id}")]
+    [SwaggerOperation("Get a customer by id")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCustomer(int id)
     {
 
         var customerResult = await context.Customers
-            .Where(c => c.Id == id) //search the customer for Id
-            .Include(c => c.Sales) //include Sales in the search
-            .Select(c => new //for each 'c' create a new object
+            .Where(c => c.Id == id)
+            .Select(c => new CustomerResponse
             {
-                c.Id,
-                c.Name,
-                Sales = c.Sales
-                .Select(s => new { s.Id }) //include de Id of Sales
+                Id = c.Id,
+                Name = c.Name,
+                Sales = c.Sales.Count
             })
             .SingleOrDefaultAsync();
 
@@ -62,9 +57,11 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
     }
 
 
-    // PUT: api/Customers/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutCustomer(int id, CustomerCreateRequest request)
+    [SwaggerOperation("Update customer by id")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PutCustomer(int id, CustomerUpdateRequest request)
     {
         try
         {
@@ -78,56 +75,58 @@ public class CustomersController(StoreContext context, ILogger<Customer> logger)
             }
 
             customer.Name = request.Name;
-
             await context.SaveChangesAsync();
-
             return Ok(customer);
         }
         catch (DbUpdateException dbEx)
         {
-            logger.LogError(dbEx, "Database update failed for customer ID {Id}", id);
+            logger.LogError(dbEx, "Database update failed");
+            return BadRequest();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error update failed");
             return BadRequest();
         }
     }
 
-    // POST: api/Customers
     [HttpPost]
+    [SwaggerOperation("Create a new customer")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> PostCustomer(CustomerCreateRequest request)
     {
-        var newCustomer = new Customer
-        {
-            Name = request.Name,
-        };
-
-        context.Customers.Add(newCustomer);
-
         try
         {
+            var newCustomer = new Customer
+            {
+                Name = request.Name,
+            };
+
+            context.Customers.Add(newCustomer);
             await context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetCustomer), new { id = newCustomer.Id }, newCustomer);
         }
         catch (DbUpdateException dbEx)
         {
-            logger.LogError(dbEx, "Failed to create customer");
+            logger.LogError(dbEx, "Error in DB");
+            return BadRequest();
+
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create customer");
             return BadRequest();
         }
     }
 
-    // DELETE: api/Customers/5
     [HttpDelete("{id}")]
+    [SwaggerOperation("Delete customer by id")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
-        var customerResult = await context.Customers
-            .SingleOrDefaultAsync(c => c.Id == id);
-
-        if (customerResult == null)
-        {
-            logger.LogWarning("The customer is null");
-            return NotFound();
-        }
-
-        context.Customers.Remove(customerResult);
-        await context.SaveChangesAsync();
+        await context.Customers.Where(c => c.Id == id).ExecuteDeleteAsync();
         return NoContent();
     }
 }

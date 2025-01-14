@@ -1,7 +1,10 @@
 using EntityFrameworkExercise.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
+
 var configuration = builder.Configuration;
 
 // Add services to the container.
@@ -22,6 +25,20 @@ services.AddControllers();
 
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Sua API",
+        Version = "v1",
+        Description = "Descrição da sua API"
+    });
+
+    c.EnableAnnotations();
+
+    c.CustomSchemaIds(type => type.FullName);
+});
 
 var app = builder.Build();
 

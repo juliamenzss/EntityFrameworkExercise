@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using EntityFrameworkExercise.Data;
 using EntityFrameworkExercise.Models;
 using EntityFrameworkExercise.Requests;
+using Swashbuckle.Swagger.Annotations;
+using EntityFrameworkExercise.Response;
+using System.Data.Common;
 
 namespace EntityFrameworkExercise.Controllers;
 
@@ -15,8 +18,9 @@ namespace EntityFrameworkExercise.Controllers;
 [ApiController]
 public class SalesController(StoreContext context, ILogger<Sale> logger) : ControllerBase
 {
-    // GET: api/Sales
     [HttpGet]
+    [SwaggerOperation("Return a list of Sale")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<SaleResponse>))]
     public async Task<IActionResult> GetSales(int page = 1, int pageSize = 10)
     {
 
@@ -24,28 +28,32 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
         var totalPages = (int)Math.Ceiling((decimal)totalCount / pageSize);
 
         var listResult = await context.Sales
-            .Select(s => new
+            .Select(s => new SaleResponse
             {
-                s.Id,
-                s.Date,
-                Seller = new
-                {
-                    s.Seller.Id,
-                    s.Seller.Name
-                },
-                Customer = new
-                {
-                    s.Customer.Id,
-                    s.Customer.Name
-                },
-                Products = s.Products.Select(p => new
-                {
-                    p.Id,
-                    p.Name,
-                    Price = Math.Round(p.Price, 2)
-                })
-                .OrderBy(p => p.Id)
-                .ToList()
+                Id = s.Id,
+                Date = s.Date,
+                CustomerId = s.CustomerId,
+                SellerId = s.SellerId,
+                Product = s.Products.Count
+
+                //Seller = new SellerResponse
+                //{
+                //    Id = s.Seller.Id,
+                //    Name = s.Seller.Name
+                //},
+                //Customer = new CustomerResponse
+                //{
+                //    Id = s.Customer.Id,
+                //    Name = s.Customer.Name
+                //},
+                //Products = s.Products.Select(p => new
+                //{
+                //    p.Id,
+                //    p.Name,
+                //    Price = Math.Round(p.Price, 2)
+                //})
+                //.OrderBy(p => p.Id)
+                //.ToList()
             })
             .OrderBy(c => c.Id)
             .Skip((page - 1) * pageSize)
@@ -54,34 +62,29 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
         return Ok(listResult);
     }
 
-    // GET: api/Sales/5
     [HttpGet("{id}")]
+    [SwaggerOperation("Get sale by id")]
+    [ProducesResponseType<Sale>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSale(int id)
     {
         var saleResult = await context.Sales
         .Where(s => s.Id == id)
-        .Select(s => new
+        .Select(s => new SaleResponse
         {
-            s.Id,
-            s.Date,
-            Seller = new
+            Id = s.Id,
+            Date = s.Date,
+            Seller = new SellerResponse
             {
-                s.Seller.Id,
-                s.Seller.Name
+                Id = s.Seller.Id,
+                Name = s.Seller.Name
             },
-            Customer = new
+            Customer = new CustomerResponse
             {
-                s.Customer.Id,
-                s.Customer.Name
+                Id = s.Customer.Id,
+                Name = s.Customer.Name
             },
-            Products = s.Products.Select(p => new
-            {
-                p.Id,
-                p.Name,
-                Price = Math.Round(p.Price, 2)
-            })
-                .OrderBy(p => p.Id)
-                .ToList()
+            Product = s.Products.Count
         })
         .SingleOrDefaultAsync();
 
@@ -90,29 +93,34 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
             logger.LogWarning("The sale is null");
             return NotFound();
         }
-
         return Ok(saleResult);
     }
 
-    // PUT: api/Sales/5
     [HttpPut("{id}")]
+    [SwaggerOperation("Update sale by id")]
+    [ProducesResponseType<Sale>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PutSale(int id, SaleUpdateRequest request)
     {
-
-        var sale = await context.Sales.SingleOrDefaultAsync(sale => sale.Id == id);
-        if (sale == null)
-        {
-            logger.LogWarning("The sale is null");
-            return NotFound();
-        }
-
-        sale.SellerId = request.SellerId;
-        sale.CustomerId = request.CustomerId;
-
         try
         {
+            var sale = await context.Sales.SingleOrDefaultAsync(sale => sale.Id == id);
+            if (sale == null)
+            {
+                logger.LogWarning("The sale is null");
+                return NotFound();
+            }
+
+            sale.SellerId = request.SellerId;
+            sale.CustomerId = request.CustomerId;
+
             await context.SaveChangesAsync();
-            return NoContent();
+            return Ok(sale);
+        }
+        catch (DbUpdateException dbEx)
+        {
+            logger.LogError(dbEx, "Failed DB");
+            return BadRequest();
         }
         catch (Exception ex)
         {
@@ -120,27 +128,36 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
             return BadRequest("Error to uptade sale");
         }
     }
-    // POST: api/Sales
     [HttpPost]
+    [SwaggerOperation("Create a new sale")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PostSale(SaleCreateRequest request)
     {
-        if (request == null)
-        {
-            return BadRequest("Request is null");
-        }
         try
         {
-            var products = await context.Products
-                .Where(p => request.Products
-                .Contains(p.Id))
-                .ToListAsync();
+            var customer = await context.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId);
+            if (customer == null)
+            {
+                logger.LogWarning("Customer is null");
+                return NotFound();
+            }
 
             var seller = await context.Sellers.FirstOrDefaultAsync(s => s.Id == request.SellerId);
-            var customer = await context.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId);
-
-            if (seller == null || customer == null || products == null)
+            if (seller == null)
             {
-                logger.LogWarning("Seller, product or customer is null or empty");
+                logger.LogWarning("Seller is null");
+                return NotFound();
+            }
+
+            var products = await context.Products
+            .Where(p => request.Products
+            .Contains(p.Id))
+            .ToListAsync();
+
+            if (products.Count == 0)
+            {
+                logger.LogWarning("Seller is null or empty");
                 return NotFound();
             }
 
@@ -148,23 +165,17 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
             {
                 SellerId = request.SellerId,
                 CustomerId = request.CustomerId,
+                Products = products
             };
 
             context.Sales.Add(newSale);
             await context.SaveChangesAsync();
-
-            foreach (var product in request.Products)
-            {
-                var productSale = new ProductSale
-                {
-                    ProductId = product,
-                    SaleId = newSale.Id
-                };
-                context.ProductsSales.Add(productSale);
-            }
-            await context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetSale),new { id = newSale.Id }, null);
+            return CreatedAtAction(nameof(GetSale), "Sales", new { id = newSale.Id }, null);
+        }
+        catch (DbException dbEx)
+        {
+            logger.LogError(dbEx, "Error DB");
+            return BadRequest("Error DB");
         }
         catch (Exception ex)
         {
@@ -173,21 +184,13 @@ public class SalesController(StoreContext context, ILogger<Sale> logger) : Contr
         }
     }
 
-    // DELETE: api/Sales/5
     [HttpDelete("{id}")]
+    [SwaggerOperation("Delete sale by id")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSale(int id)
     {
-        var sale = await context.Sales
-                .SingleOrDefaultAsync(s => s.Id == id);
-
-        if (sale == null)
-        {
-            logger.LogWarning("The sale is null");
-            return NotFound();
-        }
-
-        context.Sales.Remove(sale);
-        await context.SaveChangesAsync();
+        await context.Sales.Where(s => s.Id == id).ExecuteDeleteAsync();
         return NoContent();
     }
 }

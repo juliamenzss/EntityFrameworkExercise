@@ -1,12 +1,17 @@
 ﻿using EntityFrameworkExercise.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EntityFrameworkExercise.Requests
 {
     public class SaleCreateRequest
     {
+        [Required]
         public int SellerId { get; set; }
-        public int CustomerId { get; set; } = default!;
-        public List<int> Products { get; set; } = new();
+
+        [Required]
+        public int CustomerId { get; set; }
+
+        public IEnumerable<int> Products { get; set; } = [];
     }
 }

@@ -1,10 +1,14 @@
-﻿using EntityFrameworkExercise.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using EntityFrameworkExercise.Models;
 
 namespace EntityFrameworkExercise.Requests
 {
     public class SaleUpdateRequest
     {
+        [Required]
         public int SellerId { get; set; }
-        public int CustomerId { get; set; } = default!;
+
+        [Required]
+        public int CustomerId { get; set; }
     }
 }
